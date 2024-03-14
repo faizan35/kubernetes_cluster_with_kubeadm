@@ -2,7 +2,7 @@
 
 This repository provides instructions and scripts to create a Kubernetes cluster using kubeadm, with different methods.
 
-## Method 1: Using Vagrant --- In Progress ---
+## Method 1: Using Vagrant <--- In Progress --->
 
 This method utilizes Vagrant to provision virtual machines locally and set up a Kubernetes cluster using kubeadm.
 
@@ -41,7 +41,7 @@ This method utilizes Vagrant to provision virtual machines locally and set up a 
 
 6. Follow the instructions to initialize the Kubernetes cluster using kubeadm.
 
-## Method 2: Deploying on AWS with EC2 Instance --- In Progress ---
+## Method 2: Deploying on AWS with EC2 Instance <--- In Progress --->
 
 This method involves deploying Kubernetes cluster nodes on AWS EC2 instances.
 
@@ -60,7 +60,7 @@ This method involves deploying Kubernetes cluster nodes on AWS EC2 instances.
 2. Navigate to the AWS directory:
 
    ```bash
-   cd kubeadm-cluster/aws
+   cd kubernetes_cluster_with_kubeadm/aws-ec2
    ```
 
 3. Customize the Terraform configuration files if necessary.
