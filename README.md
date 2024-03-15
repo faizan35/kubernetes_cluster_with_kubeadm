@@ -86,7 +86,7 @@ This method involves deploying Kubernetes cluster nodes on AWS EC2 instances.
 
       <img src="./Img/kubeadm-token.png" width="70%">
 
-5. Execute `worker.sh` on all you nodes:
+5. Execute `worker.sh` on all you nodes (not in master or control-palne):
 
    ```bash
    bash ./worker.sh "paste your token here"
