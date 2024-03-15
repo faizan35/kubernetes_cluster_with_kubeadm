@@ -1,8 +1,5 @@
 #!/bin/bash
 
-
-# set -euxo pipefail
-
 # disable swap
 sudo swapoff -a
 
