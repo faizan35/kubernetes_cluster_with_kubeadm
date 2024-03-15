@@ -1,0 +1,6 @@
+# .vagrant
+vagrant/master/.vagrant
+vagrant/master/ubuntu-bionic-18.04-cloudimg-console.log
+
+vagrant/node/.vagrant
+vagrant/node/ubuntu-bionic-18.04-cloudimg-console.log
