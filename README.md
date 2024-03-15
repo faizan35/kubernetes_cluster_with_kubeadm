@@ -1,5 +1,7 @@
 # kubernetes cluster with kubeadm
 
+## If you like it please give it a 🌟
+
 This repository provides instructions and scripts to create a Kubernetes cluster using kubeadm, with different methods.
 
 ## Method 1: Using Vagrant <--- In Progress --->
