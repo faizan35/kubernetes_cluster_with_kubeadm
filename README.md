@@ -56,6 +56,11 @@ This method involves deploying Kubernetes cluster nodes on AWS EC2 instances.
   - control-plane = **t2.medium** or larger.
   - node = same as control-plan or **t2.small** will also work.
 
+### AWS Setup
+
+- Make sure your all instance are in same **Security group**.
+- Expose port **6443** in the **Security group**, so that worker nodes can join the cluster.
+
 ### Usage
 
 1. Clone this repository:
