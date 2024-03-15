@@ -98,6 +98,8 @@ This method involves deploying Kubernetes cluster nodes on AWS EC2 instances.
 
 6. Your Kubernetes cluster is ready.
 
+   <img src="./Img/nodes-connected.png" width="70%">
+
 ## Method 3: On AWS with EC2 (with terraform) <--- In Progress --->
 
 This method involves deploying Kubernetes cluster nodes on AWS EC2 instances.
