@@ -1,6 +1,8 @@
-# kubernetes cluster with kubeadm
+# If you like it, Hit the Star! ⭐
 
-## If you like it please give it a 🌟
+It took my time and effort, show some support by clicking the star icon on your top-right.
+
+# kubernetes cluster with kubeadm
 
 This repository provides instructions and scripts to create a Kubernetes cluster using kubeadm, with different methods.
 
