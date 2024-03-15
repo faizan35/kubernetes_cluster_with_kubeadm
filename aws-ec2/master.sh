@@ -11,6 +11,8 @@
 # # Store the provided control plane IP
 # control_plane_ip="$1"
 
+echo "Pulling kubeadm Images..."
+
 sudo kubeadm config images pull
 
 echo "Preflight Check Passed: Downloaded All Required Images"
