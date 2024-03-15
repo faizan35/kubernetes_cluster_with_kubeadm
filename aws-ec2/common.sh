@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-set -euxo pipefail
+# set -euxo pipefail
 
 # disable swap
 sudo swapoff -a
