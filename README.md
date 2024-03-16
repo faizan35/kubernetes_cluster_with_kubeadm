@@ -40,9 +40,11 @@ This repository provides instructions and scripts to create a Kubernetes cluster
 
 ---
 
-## Method 1: Using Vagrant <--- In Progress --->
+## Method 1: Using Vagrant
 
 This method utilizes Vagrant to provision virtual machines locally and set up a Kubernetes cluster using kubeadm.
+
+> In this setup by default there is **Only 1 node** in the cluster.
 
 ### Install
 
