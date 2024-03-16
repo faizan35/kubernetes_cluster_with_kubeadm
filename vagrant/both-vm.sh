@@ -7,6 +7,7 @@ vagrant_up() {
     cd node && vagrant up &
     wait
     cd master && echo "This is your master IP =" $(vagrant ssh -c "ip addr show eth1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'") &
+    cd node && echo "This is your node IP =" $(vagrant ssh -c "ip addr show eth1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'") &
     wait
     echo "Both VMs are up."
 
