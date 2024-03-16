@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# disable swap
+
 sudo swapoff -a
 
 # keeps the swaf off during reboot
