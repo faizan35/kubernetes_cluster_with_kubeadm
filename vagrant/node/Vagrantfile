@@ -2,7 +2,7 @@ Vagrant.configure("2") do |config|
   config.vm.define "node" do |node|
     node.vm.box = "bento/ubuntu-22.04"
     node.vm.hostname = "node"
-    node.vm.network "public_network", bridge: "Qualcomm QCA9377 802.11ac Wireless Adapter"
+    node.vm.network "public_network", bridge: "Your-Bridge-Adapter-name"
     node.vm.provider "virtualbox" do |vb|
       vb.memory = 2048
       vb.cpus = 1
