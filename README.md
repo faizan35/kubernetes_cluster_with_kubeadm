@@ -113,7 +113,27 @@ bash ./both-vm.sh
    cd scripts/
    ```
 
-2. Now follow the [Common Steps's](#common-steps).
+2. Execute the `common.sh` in ALL the vm's.
+
+   ```bash
+   bash ./common.sh
+   ```
+
+3. Execute the `master.sh` in your control plan.
+
+   - inside double quotes put you master ip which you got while setting up the vm's.
+
+   ```bash
+   bash ./master.sh "<master IP>"
+   ```
+
+4. Execute the `worker.sh` in your node's.
+
+   - You will get the TOKEN when master.sh finishes executing copy it and inside double quotes paste it in your nodes.
+
+   ```bash
+   bash ./worker.sh "<TOKEN>"
+   ```
 
 ---
 
