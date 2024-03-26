@@ -121,10 +121,8 @@ bash ./both-vm.sh
 
 3. Execute the `master.sh` in your control plan.
 
-   - inside double quotes put you master ip which you got while setting up the vm's.
-
    ```bash
-   bash ./master.sh "<master IP>"
+   bash ./master.sh
    ```
 
 4. Execute the `worker.sh` in your node's.
