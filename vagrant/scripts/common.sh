@@ -64,9 +64,11 @@ sudo systemctl start kubelet
 
 # =================================   PORT   ====================================
 
-sudo apt-get install -y ufw
+# sudo apt-get install -y ufw
 
 sudo ufw allow 6443
-sudo ufw enable
+# sudo ufw enable
+
+sudo ufw status
 
 #####################################################################
