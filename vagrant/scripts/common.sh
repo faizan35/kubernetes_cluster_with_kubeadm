@@ -51,8 +51,8 @@ echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.
 
 
 sudo apt-get update -y
-sudo apt-get install -y kubelet kubectl kubeadm
-# sudo apt-get install -y kubelet="1.29.0-*" kubectl="1.29.0-*" kubeadm="1.29.0-*"
+# sudo apt-get install -y kubelet kubectl kubeadm
+sudo apt-get install -y kubelet="1.29.0-*" kubectl="1.29.0-*" kubeadm="1.29.0-*"
 sudo apt-get update -y
 sudo apt-get install -y jq
 
