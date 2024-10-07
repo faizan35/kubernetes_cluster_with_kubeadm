@@ -3,12 +3,11 @@
 # Function to bring up both VMs
 vagrant_up() {
     echo "Bringing up both VMs..."
-    cd master && vagrant up &
-    cd node && vagrant up &
+    cd master && vagrant up && cd .. && cd node && vagrant up && cd ..
     wait
-    cd master && echo "This is your master IP =" $(vagrant ssh -c "ip addr show eth1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'") &
-    cd node && echo "This is your node IP =" $(vagrant ssh -c "ip addr show eth1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'") &
-    wait
+    cd master && echo "This is your master IP =" $(vagrant ssh -c "ip addr show eth1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'") && cd ..
+    cd node && echo "This is your node IP =" $(vagrant ssh -c "ip addr show eth1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'")
+
     echo "Both VMs are up."
 
 }
@@ -16,8 +15,8 @@ vagrant_up() {
 # Function to destroy both VMs
 vagrant_destroy() {
     echo "Destroying both VMs..."
-    cd master && vagrant destroy -f &
-    cd node && vagrant destroy -f &
+    cd master && vagrant destroy -f && cd ..
+    cd node && vagrant destroy -f && cd ..
     wait
     echo "Both VMs are destroyed."
 }

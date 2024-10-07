@@ -2,10 +2,11 @@ Vagrant.configure("2") do |config|
   config.vm.define "node" do |node|
     node.vm.box = "bento/ubuntu-22.04"
     node.vm.hostname = "node"
-    node.vm.network "public_network", bridge: "Your-Bridge-Adapter-name"
+    node.vm.network "public_network", bridge: "Qualcomm QCA9377 802.11ac Wireless Adapter", mac: "08002710F69E"
     node.vm.provider "virtualbox" do |vb|
-      vb.memory = 2048
-      vb.cpus = 1
+      vb.memory = 3548
+      vb.cpus = 3
+      # vb.disksize = 16240
     end
     node.vm.provision "shell", inline: <<-SHELL
       sudo ufw allow 22
