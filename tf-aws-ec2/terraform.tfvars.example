@@ -1,0 +1,62 @@
+# Copy to terraform.tfvars and edit:
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# Every value below is optional — each has a default in variables.tf.
+# Uncomment only what you want to change.
+
+# ---------------------------------------------------------------------------
+# Region and naming
+# ---------------------------------------------------------------------------
+
+# KodeKloud playground usually hands you us-east-1.
+aws_region = "us-east-1"
+
+# Prefix for every resource name and tag.
+# cluster_name = "cka"
+
+# ---------------------------------------------------------------------------
+# Access
+# ---------------------------------------------------------------------------
+
+# Lock SSH and the API to your own IP:  curl -s ifconfig.me
+# Leave as 0.0.0.0/0 only on a short-lived playground account.
+allowed_cidr = "0.0.0.0/0"
+
+# Generate first:  ssh-keygen -t ed25519 -f ~/.ssh/kubeadm-lab -N ""
+ssh_public_key_path = "~/.ssh/kubeadm-lab.pub"
+
+# ---------------------------------------------------------------------------
+# Compute
+# ---------------------------------------------------------------------------
+
+# Hadrcoded AMI ID is region-specific and gets deprecated. Look it up!
+# Harcoding it to speedup the lab, but you can use the data source in compute.tf instead.
+instance_ami = "ami-0b6d9d3d33ba97d99"
+
+# The base jump host runs nothing but SSH — t3.micro is plenty.
+base_instance_type = "t3.micro"
+
+# Cluster nodes. 2 vCPU is a kubeadm hard requirement for the control plane.
+instance_type = "t3.medium"
+
+# 1 = enough for most of the plan.
+# 2 = lets you practise `kubectl drain` properly, since workloads have
+#     somewhere to relocate to. Worth it for Week 2 Day 9.
+worker_count = 1
+
+root_volume_size = 30
+
+# ---------------------------------------------------------------------------
+# Networking
+# ---------------------------------------------------------------------------
+
+# Node IPs are derived from subnet_cidr:
+#   base .5   cp .10   node01 .11   node02 .12
+vpc_cidr    = "10.0.0.0/16"
+subnet_cidr = "10.0.1.0/24"
+
+# NOTE: the POD network CIDR is NOT a Terraform variable.
+# It lives in scripts/master.sh (POD_CIDR="192.168.0.0/16") because that is
+# where `kubeadm init --pod-network-cidr` is actually called, and it must match
+# what Calico expects. If you change it there, make sure it still does not
+# overlap vpc_cidr above.

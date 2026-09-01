@@ -1,0 +1,93 @@
+#!/bin/bash
+# Rendered by Terraform, run as root by cloud-init at first boot.
+# Log:  /var/log/cka-bootstrap.log
+# Done: /var/log/cka-bootstrap-done
+set -euo pipefail
+exec > >(tee -a /var/log/cka-bootstrap.log) 2>&1
+
+echo "===> hostname: ${node_name}"
+hostnamectl set-hostname "${node_name}"
+
+echo "===> /etc/hosts"
+cat >> /etc/hosts <<'HOSTS_EOF'
+
+# --- CKA lab ---
+${hosts_entries}
+HOSTS_EOF
+
+install -d -m 700 -o ubuntu -g ubuntu /home/ubuntu/.ssh
+
+%{ if is_jump_host ~}
+# ---------------------------------------------------------------------------
+# BASE - the jump host.
+#
+# Deliberately has NO kubectl, NO yq, NO cluster tools, exactly like the exam's
+# base system. Every task starts here and you SSH out to the host it names.
+#
+# Holds the PRIVATE half of the cluster key. The cluster nodes do NOT, so
+# nested SSH (node -> node) fails here just as it does in the exam.
+# ---------------------------------------------------------------------------
+cat > /home/ubuntu/.ssh/id_ed25519 <<'KEY_EOF'
+${cluster_private_key}
+KEY_EOF
+chmod 600 /home/ubuntu/.ssh/id_ed25519
+chown ubuntu:ubuntu /home/ubuntu/.ssh/id_ed25519
+
+cat > /home/ubuntu/.ssh/config <<'CFG_EOF'
+Host cp node*
+  User ubuntu
+  IdentityFile ~/.ssh/id_ed25519
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  LogLevel ERROR
+CFG_EOF
+chmod 600 /home/ubuntu/.ssh/config
+chown ubuntu:ubuntu /home/ubuntu/.ssh/config
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y vim less
+
+cat > /etc/motd <<'MOTD_EOF'
+
+  +------------------------------------------------------------+
+  |  base - jump host                                          |
+  |                                                            |
+  |  No kubectl here, on purpose. Same as the CKA exam.        |
+  |                                                            |
+  |    ssh cp          control plane (kubectl + kubeconfig)    |
+  |    ssh node01      worker                                  |
+  |                                                            |
+  |  Always: ssh <host> -> hostname -> work -> exit            |
+  |  Nested SSH will fail, exactly as it does in the exam.     |
+  +------------------------------------------------------------+
+
+MOTD_EOF
+%{ else ~}
+# ---------------------------------------------------------------------------
+# CLUSTER NODE - accepts SSH from base only.
+# No private key here, so `ssh node02` from this box fails. Deliberate: the
+# exam does not support nested SSH and this enforces the right habit.
+# ---------------------------------------------------------------------------
+echo '${cluster_public_key}' >> /home/ubuntu/.ssh/authorized_keys
+chmod 600 /home/ubuntu/.ssh/authorized_keys
+chown ubuntu:ubuntu /home/ubuntu/.ssh/authorized_keys
+
+echo "===> placing cluster scripts"
+cat > /home/ubuntu/master.sh <<'MASTER_SH_EOF'
+${master_sh}
+MASTER_SH_EOF
+
+cat > /home/ubuntu/worker.sh <<'WORKER_SH_EOF'
+${worker_sh}
+WORKER_SH_EOF
+
+chmod +x /home/ubuntu/master.sh /home/ubuntu/worker.sh
+chown ubuntu:ubuntu /home/ubuntu/master.sh /home/ubuntu/worker.sh
+
+echo "===> node preparation"
+${common_sh}
+%{ endif ~}
+
+touch /var/log/cka-bootstrap-done
+echo "===> bootstrap complete on ${node_name}"

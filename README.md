@@ -2,9 +2,20 @@
 
 It took my time and effort, show some support by clicking the star icon on your top-right.
 
-# kubernetes cluster with kubeadm
+# kubernetes cluster with kubeadm - CKA Lab
 
 This repository provides instructions and scripts to create a Kubernetes cluster using kubeadm, with different methods.
+
+---
+
+## Contents
+
+- [Common Steps](#common-steps)
+- [Method 1: Using Vagrant](#method-1-using-vagrant)
+- [Method 2: On AWS with EC2 (without Terraform)](#method-2-on-aws-with-ec2-without-terraform)
+- [Method 3: On AWS with EC2 (with Terraform) — For CKA](#method-3-on-aws-with-ec2-with-terraform---for-cka)
+
+---
 
 ## Common Step's
 
@@ -126,7 +137,6 @@ bash ./both-vm.sh
    ```
 
 4. Execute the `worker.sh` in your node's.
-
    - You will get the TOKEN when master.sh finishes executing copy it and inside double quotes paste it in your nodes.
 
    ```bash
@@ -162,56 +172,16 @@ This method involves deploying Kubernetes cluster nodes on AWS EC2 instances.
 2. Navigate to the AWS directory:
 
    ```bash
-   cd kubernetes_cluster_with_kubeadm/aws-ec2
+   cd scripts
    ```
 
 3. Now follow the [**Common Steps's**](#common-steps).
 
 ---
 
-## Method 3: On AWS with EC2 (with terraform) <--- In Progress --->
+## Method 3: On AWS with EC2 (with Terraform) - For **CKA**
 
-This method involves deploying Kubernetes cluster nodes on AWS EC2 instances.
-
-### Prerequisites
-
-- AWS Account with appropriate permissions
-
-### Usage
-
-1. Clone this repository:
-
-   ```bash
-   git clone https://github.com/faizan35/kubernetes_cluster_with_kubeadm.git
-   ```
-
-2. Navigate to the AWS directory:
-
-   ```bash
-   cd kubernetes_cluster_with_kubeadm/tf-aws-ec2
-   ```
-
-3. Customize the Terraform configuration files if necessary.
-
-4. Initialize Terraform:
-
-   ```bash
-   terraform init
-   ```
-
-5. Deploy the infrastructure:
-
-   ```bash
-   terraform apply
-   ```
-
-6. Once the instances are deployed, SSH into the master node:
-
-   ```bash
-   ssh -i <path_to_key_file> ubuntu@<master_public_ip>
-   ```
-
-7. Follow the instructions to initialize the Kubernetes cluster using kubeadm.
+> For instrustions [Read here](./tf-aws-ec2/README.md).
 
 ## Contributing
 
