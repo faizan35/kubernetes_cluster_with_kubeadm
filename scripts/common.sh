@@ -117,39 +117,46 @@ systemctl enable --now kubelet
 # ---------------------------------------------------------------------------
 
 echo "==> Shell environment for ubuntu user"
+# ONLY what the exam itself pre-configures: the `k` alias and completion.
+#
+# Deliberately NOT set here: $do, $now, and ~/.vimrc. The exam does NOT
+# pre-configure those -- you type them yourself on every host, every time.
+# Pre-baking them into the lab would rob you of the reps and leave you slower
+# on exam day, which is the exact opposite of what this lab is for.
 cat >> /home/ubuntu/.bashrc <<'BASHRC_EOF'
 
-# ---- CKA exam parity ----
+# ---- matches the CKA exam's pre-installed state ----
 source /usr/share/bash-completion/bash_completion
 alias k=kubectl
 source <(kubectl completion bash)
 complete -o default -F __start_kubectl k
-
-# Set yourself in the exam; here already so muscle memory transfers.
-export do="--dry-run=client -o yaml"
-export now="--force --grace-period=0"
 BASHRC_EOF
 
-cat > /home/ubuntu/.vimrc <<'VIMRC_EOF'
-set expandtab
-set tabstop=2
-set shiftwidth=2
-set number
-VIMRC_EOF
+chown ubuntu:ubuntu /home/ubuntu/.bashrc
 
-chown ubuntu:ubuntu /home/ubuntu/.bashrc /home/ubuntu/.vimrc
-
-# Root gets them too, since `sudo -i` is how you do most control plane work.
-cp /home/ubuntu/.vimrc /root/.vimrc
+# Root gets the same, since `sudo -i` is how most control plane work happens.
 cat >> /root/.bashrc <<'ROOT_BASHRC_EOF'
 
 source /usr/share/bash-completion/bash_completion
 alias k=kubectl
 source <(kubectl completion bash)
 complete -o default -F __start_kubectl k
-export do="--dry-run=client -o yaml"
-export now="--force --grace-period=0"
 ROOT_BASHRC_EOF
+
+# Your 20-second exam warm-up, kept as a reference you must TYPE, not source.
+# Read it if you blank; do not get into the habit of running it.
+cat > /home/ubuntu/EXAM-WARMUP.txt <<'WARMUP_EOF'
+Type these on every host you ssh into. The exam does not set them for you.
+
+  export do="--dry-run=client -o yaml"
+  export now="--force --grace-period=0"
+
+  vim ~/.vimrc
+    set expandtab tabstop=2 shiftwidth=2 number
+
+Already done for you by the exam (and by this lab): k alias, bash completion.
+WARMUP_EOF
+chown ubuntu:ubuntu /home/ubuntu/EXAM-WARMUP.txt
 
 echo
 echo "===================================================="
