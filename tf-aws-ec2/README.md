@@ -307,6 +307,10 @@ Check in order:
 2. Token validity — `kubeadm token list` on `cp`
 3. CA cert hash — regenerate the whole command with `kubeadm token create --print-join-command`
 
+**`kubeadm join` fails with `CRI... connection refused`, but `sudo crictl ps` works fine seconds later**
+
+Not a real failure — a timing race in `worker.sh`'s cleanup step. Deleting `/etc/cni/net.d` while containerd is running crashes it (containerd watches that directory), and systemd's auto-restart takes a few seconds. If the join attempt fires in that gap, it sees a dead socket. This was fixed by making `worker.sh` explicitly restart containerd and wait for `crictl info` to succeed before joining. If you're still hitting this, confirm you have the current `worker.sh` — check for the `Waiting for containerd to be ready` line near the top of its output. If that line is missing, redeploy from this repo. Otherwise just re-run the same command; it's idempotent.
+
 **`kubectl` works as `ubuntu` but not under `sudo -i`**
 
 `master.sh` copies the kubeconfig to `/root/.kube/config`. If you reset and re-ran `kubeadm init` manually, redo that copy.
