@@ -1,3 +1,8 @@
+output "availability_zone" {
+  description = "AZ chosen for the subnet (auto-selected unless overridden)"
+  value       = local.availability_zone
+}
+
 output "base_public_ip" {
   description = "Public IP of the base jump host. This is your only entry point."
   value       = aws_instance.base.public_ip

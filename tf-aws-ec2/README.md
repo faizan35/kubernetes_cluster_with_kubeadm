@@ -258,6 +258,19 @@ sudo systemctl restart containerd
 
 ## Troubleshooting
 
+**`Unsupported: Your requested instance type (t3.medium) is not supported in your requested Availability Zone (us-east-1e)`**
+
+Not every AZ offers every instance type — `us-east-1e` has no t3 capacity at all. The config now asks the EC2 API which AZs support both your instance types and pins the subnet to one of them, so this shouldn't recur.
+
+If you hit it on an older copy of the config, or want a specific AZ:
+
+```hcl
+# terraform.tfvars
+availability_zone = "us-east-1a"
+```
+
+Then `terraform apply` again. Changing the AZ replaces the subnet, which is fine — the instances failed to create anyway. Confirm afterwards with `terraform output availability_zone`.
+
 **`cloud-init status --wait` never returns**
 
 ```bash

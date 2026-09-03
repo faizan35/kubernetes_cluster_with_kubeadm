@@ -34,11 +34,40 @@ variable "ssh_public_key_path" {
 # Compute
 # ---------------------------------------------------------------------------
 
+variable "availability_zone" {
+  type        = string
+  description = <<-EOT
+    Leave empty to auto-select an AZ that supports BOTH instance types.
+    Set explicitly (e.g. "us-east-1a") only if you need a specific one.
+    Never leave the subnet unpinned -- AWS may place it in an AZ with no t3
+    capacity (us-east-1e), and every instance will fail to launch.
+  EOT
+  default     = ""
+}
 
 variable "instance_ami" {
   type        = string
-  description = "AMI for all instances. Looked up, not hardcoded. AMI IDs are region-specific and get deprecated, and a playground account may hand you a different region."
+  description = <<-EOT
+    AMI for all instances.
+
+    Set an ID (e.g. "ami-0b6d9d3d33ba97d99") to skip the AMI lookup entirely --
+    fastest apply, and fine for a lab where you control the region.
+
+    Set to "" to auto-look-up the latest Ubuntu 24.04 AMI for the current
+    region instead. Do that if you switch regions or the pinned AMI is
+    deprecated (symptom on apply: "InvalidAMIID.NotFound").
+
+    AMI IDs are REGION-SPECIFIC. An ID valid in us-east-1 will not exist in
+    eu-west-1, and the failure message does not spell that out.
+  EOT
+  default     = "ami-0b6d9d3d33ba97d99" # Ubuntu 24.04, us-east-1
+
+  validation {
+    condition     = var.instance_ami == "" || can(regex("^ami-[0-9a-f]{8,17}$", var.instance_ami))
+    error_message = "instance_ami must be empty (to auto-look-up) or a valid AMI ID like ami-0b6d9d3d33ba97d99."
+  }
 }
+
 
 variable "base_instance_type" {
   type        = string

@@ -29,8 +29,14 @@ ssh_public_key_path = "~/.ssh/kubeadm-lab.pub"
 # Compute
 # ---------------------------------------------------------------------------
 
-# Hadrcoded AMI ID is region-specific and gets deprecated. Look it up!
-# Harcoding it to speedup the lab, but you can use the data source in compute.tf instead.
+# AMI. Two modes, no code editing needed to switch between them:
+#
+#   "ami-..."  pin an ID. Skips the AMI lookup, fastest apply. Lab default.
+#   ""         auto-look-up the latest Ubuntu 24.04 AMI for this region.
+#
+# AMI IDs are REGION-SPECIFIC. The ID below is Ubuntu 24.04 in us-east-1.
+# If you change aws_region, either set this to "" or find that region's ID,
+# otherwise apply fails with "InvalidAMIID.NotFound".
 instance_ami = "ami-0b6d9d3d33ba97d99"
 
 # The base jump host runs nothing but SSH — t3.micro is plenty.

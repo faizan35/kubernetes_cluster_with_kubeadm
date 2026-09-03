@@ -1,28 +1,36 @@
 # ---------------------------------------------------------------------------
-# AMI
+# AMI — two modes, no code editing needed to switch
 # ---------------------------------------------------------------------------
-# Looked up, not hardcoded. AMI IDs are region-specific and get deprecated,
-# and a playground account may hand you a different region.
+#   var.instance_ami = "ami-0b6d..."  -> use that ID directly. No API lookup,
+#                                        fastest apply. This is the lab default.
+#   var.instance_ami = ""             -> look up the latest Ubuntu 24.04 AMI
+#                                        for whatever region you are in.
 
-# data "aws_ami" "ubuntu" {
-#   most_recent = true
-#   owners      = ["099720109477"] # Canonical
+data "aws_ami" "ubuntu" {
+  count = var.instance_ami == "" ? 1 : 0
 
-#   filter {
-#     name   = "name"
-#     values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
-#   }
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
 
-#   filter {
-#     name   = "virtualization-type"
-#     values = ["hvm"]
-#   }
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
 
-#   filter {
-#     name   = "root-device-type"
-#     values = ["ebs"]
-#   }
-# }
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  filter {
+    name   = "root-device-type"
+    values = ["ebs"]
+  }
+}
+
+locals {
+  ami_id = var.instance_ami != "" ? var.instance_ami : data.aws_ami.ubuntu[0].id
+}
 
 # ---------------------------------------------------------------------------
 # Keys
@@ -48,7 +56,7 @@ resource "tls_private_key" "cluster" {
 # base system. This is where every task starts.
 
 resource "aws_instance" "base" {
-  ami                    = var.instance_ami
+  ami                    = local.ami_id
   instance_type          = var.base_instance_type
   subnet_id              = aws_subnet.main.id
   private_ip             = local.base_ip
@@ -84,7 +92,7 @@ resource "aws_instance" "base" {
 # ---------------------------------------------------------------------------
 
 resource "aws_instance" "control_plane" {
-  ami                    = var.instance_ami
+  ami                    = local.ami_id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.main.id
   private_ip             = local.control_plane_ip
@@ -122,7 +130,7 @@ resource "aws_instance" "control_plane" {
 resource "aws_instance" "worker" {
   count = var.worker_count
 
-  ami                    = var.instance_ami
+  ami                    = local.ami_id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.main.id
   private_ip             = local.worker_ips[count.index]

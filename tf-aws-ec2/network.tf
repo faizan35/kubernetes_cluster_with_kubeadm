@@ -13,6 +13,13 @@ resource "aws_subnet" "main" {
   cidr_block              = var.subnet_cidr
   map_public_ip_on_launch = true
 
+  # Pinned deliberately. Left unset, AWS picks any AZ in the region -- and some
+  # AZs (us-east-1e is the classic) offer no t3 instances at all, so every
+  # RunInstances call fails with "instance type not supported in your
+  # requested Availability Zone". See locals.tf: the AZ is computed from the
+  # instance types you actually asked for.
+  availability_zone = local.availability_zone
+
   tags = {
     Name = "${var.cluster_name}-subnet"
   }
