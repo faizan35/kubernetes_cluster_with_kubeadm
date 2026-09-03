@@ -187,11 +187,9 @@
     - name: Cluster is ready
       ansible.builtin.debug:
         msg: "{{ nodes.stdout_lines }}"
-
-    - name: Drop a marker so base's cloud-init can report success
-      ansible.builtin.file:
-        path: /var/log/cka-cluster-ready
-        state: touch
-        mode: "0644"
-      delegate_to: localhost
-      become: false
+# The /var/log/cka-cluster-ready marker is written by base's user_data, not
+# here -- user_data already runs as root and only touches it when this playbook
+# exits 0. Doing it from inside the playbook was both redundant and actively
+# harmful: it ran as the unprivileged ubuntu user via delegate_to, failed on
+# /var/log permissions, and that non-zero exit stopped user_data from writing
+# the real marker on a cluster that had actually built perfectly.

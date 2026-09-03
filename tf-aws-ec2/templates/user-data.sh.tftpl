@@ -95,6 +95,17 @@ ALL_VARS_EOF
 
 chown -R ubuntu:ubuntu /home/ubuntu/ansible
 
+# Catch config/syntax errors instantly. A bad ansible.cfg (e.g. a removed
+# callback plugin) aborts at startup, and without this check you would not
+# find out until you went looking for a cluster that was never built.
+echo "===> validating ansible config and playbook"
+if ! sudo -u ubuntu -H sh -c 'cd /home/ubuntu/ansible && ansible-playbook --syntax-check site.yml' \
+       > /var/log/cka-ansible.log 2>&1; then
+  echo "!! Ansible config or playbook is invalid. Nothing was built."
+  echo "!! Read /var/log/cka-ansible.log"
+  exit 0   # let cloud-init finish so you can still ssh in and fix it
+fi
+
 echo "===> running ansible to build the cluster"
 echo "     this waits for cp and the workers to finish their own bootstrap first,"
 echo "     so expect several minutes of apparent inactivity. Follow along with:"
@@ -103,7 +114,7 @@ echo "       sudo tail -f /var/log/cka-ansible.log"
 # Run as ubuntu so it uses ubuntu's SSH key. Output is teed to its own log so a
 # failure here is easy to read without wading through all of cloud-init.
 if sudo -u ubuntu -H sh -c 'cd /home/ubuntu/ansible && ansible-playbook site.yml' \
-     > /var/log/cka-ansible.log 2>&1; then
+     >> /var/log/cka-ansible.log 2>&1; then
   touch /var/log/cka-cluster-ready
   echo "===> CLUSTER READY"
 else
