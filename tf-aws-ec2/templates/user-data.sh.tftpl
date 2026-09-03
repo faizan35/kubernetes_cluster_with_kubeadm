@@ -51,18 +51,65 @@ apt-get install -y vim less
 cat > /etc/motd <<'MOTD_EOF'
 
   +------------------------------------------------------------+
-  |  base - jump host                                          |
+  |  base - jump host          [ansible branch]                |
   |                                                            |
   |  No kubectl here, on purpose. Same as the CKA exam.        |
   |                                                            |
   |    ssh cp          control plane (kubectl + kubeconfig)    |
   |    ssh node01      worker                                  |
   |                                                            |
+  |  The cluster was built automatically by Ansible.           |
+  |    ~/ansible/               playbook and inventory         |
+  |    /var/log/cka-ansible.log run log                        |
+  |    cd ~/ansible && ansible-playbook site.yml   re-run      |
+  |                                                            |
   |  Always: ssh <host> -> hostname -> work -> exit            |
   |  Nested SSH will fail, exactly as it does in the exam.     |
   +------------------------------------------------------------+
 
 MOTD_EOF
+
+# ---------------------------------------------------------------------------
+# Ansible — build the cluster with no manual steps
+# ---------------------------------------------------------------------------
+echo "===> installing ansible"
+apt-get install -y ansible-core
+
+install -d -m 755 -o ubuntu -g ubuntu /home/ubuntu/ansible/group_vars
+
+cat > /home/ubuntu/ansible/ansible.cfg <<'ANSIBLE_CFG_EOF'
+${ansible_cfg}
+ANSIBLE_CFG_EOF
+
+cat > /home/ubuntu/ansible/inventory.ini <<'INVENTORY_EOF'
+${ansible_inventory}
+INVENTORY_EOF
+
+cat > /home/ubuntu/ansible/site.yml <<'SITE_YML_EOF'
+${ansible_site_yml}
+SITE_YML_EOF
+
+cat > /home/ubuntu/ansible/group_vars/all.yml <<'ALL_VARS_EOF'
+${ansible_all_vars}
+ALL_VARS_EOF
+
+chown -R ubuntu:ubuntu /home/ubuntu/ansible
+
+echo "===> running ansible to build the cluster"
+echo "     this waits for cp and the workers to finish their own bootstrap first,"
+echo "     so expect several minutes of apparent inactivity. Follow along with:"
+echo "       sudo tail -f /var/log/cka-ansible.log"
+
+# Run as ubuntu so it uses ubuntu's SSH key. Output is teed to its own log so a
+# failure here is easy to read without wading through all of cloud-init.
+if sudo -u ubuntu -H sh -c 'cd /home/ubuntu/ansible && ansible-playbook site.yml' \
+     > /var/log/cka-ansible.log 2>&1; then
+  touch /var/log/cka-cluster-ready
+  echo "===> CLUSTER READY"
+else
+  echo "!! Ansible failed. Read /var/log/cka-ansible.log"
+  echo "!! Re-run by hand:  ssh base ; cd ~/ansible ; ansible-playbook site.yml"
+fi
 %{ else ~}
 # ---------------------------------------------------------------------------
 # CLUSTER NODE - accepts SSH from base only.

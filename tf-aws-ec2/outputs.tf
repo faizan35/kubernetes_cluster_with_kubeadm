@@ -35,43 +35,39 @@ output "next_steps" {
   value = <<-EOT
 
     ┌──────────────────────────────────────────────────────────────────────┐
-    │  CKA lab provisioning — exam-shaped topology                         │
+    │  CKA lab — ANSIBLE branch (cluster builds itself)                    │
     └──────────────────────────────────────────────────────────────────────┘
 
       base    ${aws_instance.base.private_ip}    jump host, NO kubectl (public ${aws_instance.base.public_ip})
       cp      ${aws_instance.control_plane.private_ip}    control plane
     ${join("\n    ", [for i, ip in aws_instance.worker[*].private_ip : "  ${local.worker_names[i]}  ${ip}    worker"])}
 
-    1. Wait for bootstrap (~4-5 min; nodes install k8s, helm, yq, etcdctl):
+    There are NO manual steps. base installs Ansible, waits for every node to
+    finish its own bootstrap, then runs kubeadm init + join for you.
+
+    1. Wait for the whole cluster (~10-12 min). This returns only when the
+       cluster is genuinely Ready, not merely when the VM has booted:
 
        ssh -i ${replace(var.ssh_public_key_path, ".pub", "")} ubuntu@${aws_instance.base.public_ip} 'cloud-init status --wait'
 
-    2. SSH into base. This is your ONLY entry point, same as the exam:
+       Watch it work, if you like:
+       ssh -i ${replace(var.ssh_public_key_path, ".pub", "")} ubuntu@${aws_instance.base.public_ip} 'sudo tail -f /var/log/cka-ansible.log'
+
+    2. Confirm it succeeded:
+
+       ssh -i ${replace(var.ssh_public_key_path, ".pub", "")} ubuntu@${aws_instance.base.public_ip} 'ls /var/log/cka-cluster-ready'
+
+    3. Use it. base is still your only entry point, same as the exam:
 
        ssh -i ${replace(var.ssh_public_key_path, ".pub", "")} ubuntu@${aws_instance.base.public_ip}
-
-    3. From base, initialise the control plane:
-
        ssh cp
-       cloud-init status --wait        # make sure node prep finished
-       bash ~/master.sh                # copy the join command
-       exit                            # BACK TO BASE — nested ssh will fail
+       kubectl get nodes -o wide
 
-    4. From base, join each worker:
+    If Ansible failed:   sudo cat /var/log/cka-ansible.log
+    Re-run it:           ssh base ; cd ~/ansible ; ansible-playbook site.yml
+    Manual fallback:     ~/master.sh and ~/worker.sh are still on the nodes
 
-       ssh ${local.worker_names[0]}
-       bash ~/worker.sh "<join command>"
-       exit
-
-    5. Verify from base:
-
-       ssh cp
-       kubectl get nodes -o wide       # all Ready, v1.35.x
-       crictl version                  # containerd
-       exit
-
-    Bootstrap log:  sudo cat /var/log/cka-bootstrap.log
-    Tear down:      terraform destroy -auto-approve
+    Tear down:           terraform destroy -auto-approve
 
   EOT
 }

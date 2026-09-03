@@ -1,0 +1,9 @@
+---
+# Must match POD_CIDR in scripts/master.sh — Calico expects this range.
+pod_network_cidr: "192.168.0.0/16"
+calico_version: "v3.28.2"
+
+# Non-expiring token. This is a lab you rebuild constantly; regenerating a
+# 24h token every session is friction with no learning value. When you want
+# to PRACTISE the exam task, use the manual master.sh path on the main branch.
+join_token_ttl: "0"

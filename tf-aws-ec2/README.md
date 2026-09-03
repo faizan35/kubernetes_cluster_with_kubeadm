@@ -1,4 +1,4 @@
-# CKA Lab
+# Usage
 
 Step-by-step for standing up and using the CKA lab cluster.
 

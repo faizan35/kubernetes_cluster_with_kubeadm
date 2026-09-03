@@ -1,0 +1,197 @@
+---
+# site.yml — brings up the whole cluster with no manual steps.
+#
+# Runs FROM the base jump host, which already holds the SSH key for every node.
+# Invoked automatically at the end of base's cloud-init, so `cloud-init status
+# --wait` on base returns only once the cluster is genuinely Ready.
+#
+# Idempotent: safe to re-run. Already-initialised control planes and
+# already-joined workers are skipped rather than reset.
+
+# ---------------------------------------------------------------------------
+# 1. Wait for every node to finish its own cloud-init before touching it
+# ---------------------------------------------------------------------------
+- name: Wait for node bootstrap to complete
+  hosts: cluster
+  gather_facts: false
+  tasks:
+    - name: Wait for SSH to answer
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 900
+
+    - name: Wait for common.sh to finish (marker written by user_data)
+      ansible.builtin.wait_for:
+        path: /var/log/cka-bootstrap-done
+        timeout: 900
+        sleep: 5
+
+    - name: Confirm kubeadm is installed and the version is right
+      ansible.builtin.command: kubeadm version -o short
+      register: kubeadm_ver
+      changed_when: false
+
+    - name: Show kubeadm version
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} -> {{ kubeadm_ver.stdout }}"
+
+    - name: Confirm containerd is running
+      ansible.builtin.systemd:
+        name: containerd
+        state: started
+        enabled: true
+      become: true
+
+# ---------------------------------------------------------------------------
+# 2. Initialise the control plane
+# ---------------------------------------------------------------------------
+- name: Initialise the control plane
+  hosts: control_plane
+  become: true
+  tasks:
+    - name: Check whether the cluster is already initialised
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: admin_conf
+
+    - name: Pre-pull control plane images
+      ansible.builtin.command: kubeadm config images pull
+      when: not admin_conf.stat.exists
+      changed_when: true
+
+    - name: Run kubeadm init
+      ansible.builtin.command: >-
+        kubeadm init
+        --pod-network-cidr={{ pod_network_cidr }}
+        --apiserver-advertise-address={{ ansible_host }}
+      when: not admin_conf.stat.exists
+      changed_when: true
+      register: kubeadm_init
+
+    - name: Create .kube for the ubuntu user
+      ansible.builtin.file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Install kubeconfig for ubuntu
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/ubuntu/.kube/config
+        remote_src: true
+        owner: ubuntu
+        group: ubuntu
+        mode: "0600"
+
+    # root gets it too — most control plane work happens under `sudo -i`
+    - name: Create .kube for root
+      ansible.builtin.file:
+        path: /root/.kube
+        state: directory
+        mode: "0700"
+
+    - name: Install kubeconfig for root
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        remote_src: true
+        mode: "0600"
+
+    - name: Install the Calico CNI
+      ansible.builtin.command: >-
+        kubectl apply -f
+        https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: calico
+      changed_when: "'created' in calico.stdout or 'configured' in calico.stdout"
+
+    - name: Wait for the control plane to report Ready
+      ansible.builtin.command: kubectl wait --for=condition=Ready node --all --timeout=300s
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      changed_when: false
+
+    - name: Generate a join command for the workers
+      ansible.builtin.command: kubeadm token create --ttl {{ join_token_ttl }} --print-join-command
+      register: join_command
+      changed_when: false
+
+# ---------------------------------------------------------------------------
+# 3. Join the workers
+# ---------------------------------------------------------------------------
+- name: Join worker nodes
+  hosts: workers
+  become: true
+  serial: 1
+  tasks:
+    - name: Check whether this node has already joined
+      ansible.builtin.stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_conf
+
+    # Deleting /etc/cni/net.d while containerd is running kills it -- containerd
+    # watches that directory and its CNI monitor exits fatally. systemd restarts
+    # it a few seconds later, and a join firing in that gap fails with
+    # "connection refused". So: clean, restart, WAIT, then join.
+    - name: Remove stale CNI config
+      ansible.builtin.file:
+        path: /etc/cni/net.d
+        state: absent
+      when: not kubelet_conf.stat.exists
+
+    - name: Restart containerd after CNI cleanup
+      ansible.builtin.systemd:
+        name: containerd
+        state: restarted
+      when: not kubelet_conf.stat.exists
+
+    - name: Wait for containerd's CRI socket to answer
+      ansible.builtin.command: crictl info
+      register: crictl_check
+      until: crictl_check.rc == 0
+      retries: 15
+      delay: 2
+      changed_when: false
+      when: not kubelet_conf.stat.exists
+
+    - name: Join the cluster
+      ansible.builtin.command: "{{ hostvars[groups['control_plane'][0]]['join_command'].stdout }}"
+      when: not kubelet_conf.stat.exists
+      changed_when: true
+
+# ---------------------------------------------------------------------------
+# 4. Verify — fail loudly here rather than leaving you a half-built cluster
+# ---------------------------------------------------------------------------
+- name: Verify the cluster
+  hosts: control_plane
+  become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Wait for every node to be Ready
+      ansible.builtin.command: kubectl wait --for=condition=Ready node --all --timeout=300s
+      changed_when: false
+
+    - name: Wait for CoreDNS to be rolled out
+      ansible.builtin.command: kubectl -n kube-system rollout status deployment/coredns --timeout=300s
+      changed_when: false
+
+    - name: Collect node status
+      ansible.builtin.command: kubectl get nodes -o wide
+      register: nodes
+      changed_when: false
+
+    - name: Cluster is ready
+      ansible.builtin.debug:
+        msg: "{{ nodes.stdout_lines }}"
+
+    - name: Drop a marker so base's cloud-init can report success
+      ansible.builtin.file:
+        path: /var/log/cka-cluster-ready
+        state: touch
+        mode: "0644"
+      delegate_to: localhost
+      become: false
