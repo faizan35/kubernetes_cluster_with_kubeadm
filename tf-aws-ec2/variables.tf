@@ -60,7 +60,11 @@ variable "instance_ami" {
     AMI IDs are REGION-SPECIFIC. An ID valid in us-east-1 will not exist in
     eu-west-1, and the failure message does not spell that out.
   EOT
-  default     = "ami-0b6d9d3d33ba97d99" # Ubuntu 24.04, us-east-1
+  # Empty by default: look the AMI up for whatever region you are in. Survives
+  # both a deprecated AMI and a playground that hands you a non-us-east-1
+  # region. Pin an ID only if you are certain of the region and want the
+  # seconds back (e.g. "ami-0b6d9d3d33ba97d99" = Ubuntu 24.04, us-east-1).
+  default = ""
 
   validation {
     condition     = var.instance_ami == "" || can(regex("^ami-[0-9a-f]{8,17}$", var.instance_ami))
@@ -77,7 +81,23 @@ variable "base_instance_type" {
 
 variable "instance_type" {
   type        = string
-  description = "Control plane needs 2 vCPU minimum (kubeadm hard requirement). t3.medium is cheaper and faster than t2.medium."
+  description = "Control plane. 2 vCPU minimum (kubeadm hard requirement). Never shrink this below t3.medium."
+  default     = "t3.medium"
+}
+
+variable "worker_instance_type" {
+  type        = string
+  description = <<-EOT
+    Worker nodes, sized separately from the control plane.
+
+    THIS IS A MEMORY AND COST LEVER, NOT A vCPU LEVER.
+    Every t3 size from t3.nano through t3.large has exactly 2 vCPUs -- only
+    t3.xlarge and above have more. So t3.medium -> t3.small halves the RAM
+    (4 GiB -> 2 GiB) and cuts cost, and changes the vCPU count not at all.
+
+    If the playground refuses on a vCPU quota, the only lever that works is
+    worker_count (4 instances = 8 vCPU, 3 instances = 6 vCPU).
+  EOT
   default     = "t3.medium"
 }
 
@@ -85,10 +105,12 @@ variable "worker_count" {
   type        = number
   description = <<-EOT
     Number of worker nodes.
-    1 = enough for most of the plan.
-    2 = lets you practise drain properly (workloads relocate somewhere).
+    2 is the working default for this study plan. With a single worker you
+    cannot honestly practise: kubectl drain, pod anti-affinity, topology spread,
+    cross-node service routing, externalTrafficPolicy: Local, node removal and
+    re-join, or most realistic NotReady scenarios.
   EOT
-  default     = 1
+  default     = 2
 
   validation {
     condition     = var.worker_count >= 1 && var.worker_count <= 3

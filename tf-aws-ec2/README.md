@@ -50,7 +50,7 @@ Only three values are worth thinking about:
 ```hcl
 aws_region   = "us-east-1"     # whatever your playground gives you
 allowed_cidr = "0.0.0.0/0"     # tighten to "$(curl -s ifconfig.me)/32" if not ephemeral
-worker_count = 1               # 2 if you want to practise `kubectl drain` properly
+worker_count = 2               # 2 is the default: drain, anti-affinity, spread, cross-node routing
 ```
 
 Everything else has a sensible default.
@@ -146,7 +146,7 @@ exit
 
 **The quotes are required.** The join command contains spaces and won't survive unquoted.
 
-Repeat for `node02` if you set `worker_count = 2`.
+Repeat for `node02` (present by default at `worker_count = 2`).
 
 ---
 

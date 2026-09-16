@@ -1,5 +1,9 @@
-# Copy to terraform.tfvars and edit:
-#   cp terraform.tfvars.example terraform.tfvars
+# THIS IS THE FILE THAT ACTUALLY RUNS.
+# Terraform loads terraform.tfvars automatically and its values beat the
+# defaults in variables.tf. terraform.tfvars.example is only a template --
+# fixing the example and not this file changes nothing.
+#
+# This file is gitignored, so it does not travel with the repo.
 #
 # Every value below is optional — each has a default in variables.tf.
 # Uncomment only what you want to change.
@@ -34,21 +38,34 @@ ssh_public_key_path = "~/.ssh/kubeadm-lab.pub"
 #   "ami-..."  pin an ID. Skips the AMI lookup, fastest apply. Lab default.
 #   ""         auto-look-up the latest Ubuntu 24.04 AMI for this region.
 #
-# AMI IDs are REGION-SPECIFIC. The ID below is Ubuntu 24.04 in us-east-1.
-# If you change aws_region, either set this to "" or find that region's ID,
-# otherwise apply fails with "InvalidAMIID.NotFound".
-instance_ami = "ami-0b6d9d3d33ba97d99"
+# AMI IDs are REGION-SPECIFIC.
+#
+# DELIBERATE CHOICE: pinned, for apply speed. Verified working 16 Sep 2026.
+# The cost is a hard failure -- "InvalidAMIID.NotFound", with an error that does
+# not explain itself -- on the day AWS deprecates this AMI, or the day the
+# playground hands you a region other than us-east-1.
+#
+# If that happens the fix is one line: set this to "" and the lookup in
+# compute.tf finds the current Ubuntu 24.04 image for whatever region you are
+# in. Nothing else changes.
+instance_ami = "ami-0b6d9d3d33ba97d99" # Ubuntu 24.04, us-east-1
 
 # The base jump host runs nothing but SSH — t3.micro is plenty.
 base_instance_type = "t3.micro"
 
-# Cluster nodes. 2 vCPU is a kubeadm hard requirement for the control plane.
+# Control plane. 2 vCPU is a kubeadm hard requirement -- do not shrink this.
 instance_type = "t3.medium"
 
-# 1 = enough for most of the plan.
-# 2 = lets you practise `kubectl drain` properly, since workloads have
-#     somewhere to relocate to. Worth it for Week 2 Day 9.
-worker_count = 1
+# Workers, sized separately from the control plane.
+# NOTE: this is a MEMORY lever, not a vCPU lever. Every t3 size up to t3.large
+# has 2 vCPUs, so t3.medium -> t3.small halves RAM (4 GiB -> 2 GiB) and changes
+# nothing about vCPU. If a vCPU quota blocks the apply, the only fix is fewer
+# instances: worker_count = 1 takes you from 8 vCPU to 6.
+worker_instance_type = "t3.medium"
+
+# 2 is the working default for this study plan. One worker blocks drain,
+# anti-affinity, topology spread and cross-node service routing.
+worker_count = 2
 
 root_volume_size = 30
 

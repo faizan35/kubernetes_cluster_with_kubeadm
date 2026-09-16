@@ -20,6 +20,17 @@ resource "aws_subnet" "main" {
   # instance types you actually asked for.
   availability_zone = local.availability_zone
 
+  # Blocking assertion. See the note at the bottom of az.tf for why this is a
+  # precondition and not a `check` block: check blocks only warn, and a warning
+  # here would let the apply proceed with AWS picking the AZ -- the precise
+  # failure this whole mechanism exists to prevent.
+  lifecycle {
+    precondition {
+      condition     = local.availability_zone != ""
+      error_message = "No Availability Zone in ${var.aws_region} supports all of ${var.instance_type} (control plane), ${var.worker_instance_type} (workers) and ${var.base_instance_type} (base). Pick different instance types, or set availability_zone explicitly."
+    }
+  }
+
   tags = {
     Name = "${var.cluster_name}-subnet"
   }
