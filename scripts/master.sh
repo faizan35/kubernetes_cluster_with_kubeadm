@@ -6,7 +6,18 @@
 
 set -euo pipefail
 
-CALICO_VERSION="v3.28.2"
+# CALICO MUST MATCH THE KUBERNETES MINOR IN common.sh.
+#
+#   Calico v3.32  ->  tested against Kubernetes 1.34, 1.35, 1.36
+#   Calico v3.28  ->  tested against 1.27-1.30 only (what this repo shipped with)
+#
+# If you change K8S_MINOR in common.sh, check this too:
+#   docs.tigera.io/calico/latest/getting-started/kubernetes/requirements
+#
+# A mismatched CNI does not announce itself. The cluster builds, nodes go Ready,
+# and then Services, DNS and `kubectl exec` fail in unrelated-looking ways --
+# so you debug Kubernetes for a day when the problem is one version string.
+CALICO_VERSION="v3.32.2"
 POD_CIDR="192.168.0.0/16"
 
 if [[ $EUID -eq 0 ]]; then
