@@ -10,14 +10,23 @@
 #
 # So rather than hardcoding "us-east-1a" and hoping, ask the API which AZs
 # actually offer the instance types this config uses, and take one that
-# supports BOTH the cluster nodes and the base host.
+# supports ALL THREE: control plane, workers, and the base host.
 
-data "aws_ec2_instance_type_offerings" "cluster_nodes" {
+data "aws_ec2_instance_type_offerings" "control_plane" {
   location_type = "availability-zone"
 
   filter {
     name   = "instance-type"
     values = [var.instance_type]
+  }
+}
+
+data "aws_ec2_instance_type_offerings" "worker_nodes" {
+  location_type = "availability-zone"
+
+  filter {
+    name   = "instance-type"
+    values = [var.worker_instance_type]
   }
 }
 
@@ -30,10 +39,15 @@ data "aws_ec2_instance_type_offerings" "base_host" {
   }
 }
 
-# Only AZs that can run BOTH types are usable.
+# Only AZs that can run ALL of them are usable.
+#
+# Note: a single data source with multiple filter values would OR them, not AND
+# them -- it returns AZs offering *any* of the types. Three separate lookups
+# intersected is the only way to get "supports all of these".
 locals {
   supported_azs = sort(tolist(setintersection(
-    toset(data.aws_ec2_instance_type_offerings.cluster_nodes.locations),
+    toset(data.aws_ec2_instance_type_offerings.control_plane.locations),
+    toset(data.aws_ec2_instance_type_offerings.worker_nodes.locations),
     toset(data.aws_ec2_instance_type_offerings.base_host.locations)
   )))
 
@@ -42,15 +56,15 @@ locals {
   )
 }
 
-# Fail early with a readable message rather than three cryptic RunInstances
-# errors several minutes into the apply.
-check "availability_zone_is_usable" {
-  assert {
-    condition     = local.availability_zone != ""
-    error_message = <<-EOT
-      No Availability Zone in ${var.aws_region} supports both
-      "${var.instance_type}" (cluster nodes) and "${var.base_instance_type}" (base).
-      Pick different instance types, or set availability_zone explicitly.
-    EOT
-  }
-}
+# ---------------------------------------------------------------------------
+# Why there is no `check` block here
+# ---------------------------------------------------------------------------
+# A `check` block was the obvious home for this assertion, but check blocks
+# emit WARNINGS, not errors -- the apply continues regardless. If no AZ
+# qualified, local.availability_zone would be "", aws_subnet would fall back to
+# letting AWS choose an AZ, and you would land in exactly the us-east-1e
+# situation this file exists to prevent, with a warning you scrolled past.
+#
+# The assertion lives in network.tf as a lifecycle precondition on the subnet,
+# which HALTS the apply. `check` = continuous validation, advisory.
+# `precondition` = assertion, blocking.

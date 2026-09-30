@@ -49,6 +49,7 @@ cp ansible_host=10.0.1.10
 
 [workers]
 node01 ansible_host=10.0.1.11
+node02 ansible_host=10.0.1.12
 
 [cluster:children]
 control_plane
