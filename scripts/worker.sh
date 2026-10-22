@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-if [[ $# -lt 1 ]]; then
+if [[ $# -ne 1 ]]; then
   echo "Usage: bash ~/worker.sh \"<full kubeadm join command>\""
   echo
   echo "Get it on the control plane with:"
@@ -16,9 +16,29 @@ if [[ $# -lt 1 ]]; then
   exit 1
 fi
 
-JOIN_CMD="$*"
+# The printed kubeadm join command is whitespace-delimited; it contains no
+# shell quoting or substitutions. Read into an array rather than eval/bash -c.
+read -r -a JOIN_ARGS <<< "$1"
+if [[ ${#JOIN_ARGS[@]} -lt 4 || "${JOIN_ARGS[0]}" != "kubeadm" || "${JOIN_ARGS[1]}" != "join" ]]; then
+  echo "!! Expected the complete 'kubeadm join ...' command."
+  exit 1
+fi
+for arg in "${JOIN_ARGS[@]}"; do
+  if [[ "$arg" == "--control-plane" ]]; then
+    echo "!! worker.sh is for worker nodes only, not additional control planes."
+    exit 1
+  fi
+done
 
-echo "==> Clearing any previous join attempt"
+# Never disrupt a node that already joined merely because a command is retried.
+# Explicit opt-in for destructive re-join work: RESET_NODE=1 bash worker.sh '...'
+if [[ -f /etc/kubernetes/kubelet.conf && "${RESET_NODE:-0}" != "1" ]]; then
+  echo "!! Existing kubelet credentials detected. Node may already be joined."
+  echo "!! No changes made. For deliberate re-join: RESET_NODE=1 bash ~/worker.sh '<join command>'"
+  exit 1
+fi
+
+echo "==> Resetting leftover state from any previous join attempt"
 sudo kubeadm reset -f >/dev/null 2>&1 || true
 
 # Deleting /etc/cni/net.d while containerd is running crashes it — containerd
@@ -49,10 +69,11 @@ for i in $(seq 1 15); do
 done
 
 echo "==> Joining the cluster"
-sudo ${JOIN_CMD} --v=5
+sudo "${JOIN_ARGS[@]}" --v=5
 
 echo
 echo "======================================================================"
 echo " $(hostname) joined."
-echo " Verify from the control plane:  kubectl get nodes -o wide"
+echo " Verify from the control plane: kubectl get nodes -o wide"
+echo " Then verify CoreDNS: kubectl -n kube-system rollout status deploy/coredns"
 echo "======================================================================"

@@ -18,23 +18,28 @@ trap 'echo "!! =================================================="
 
 BOOTSTRAP_START=$(date +%s)
 
-# Kubernetes version. K8S_MINOR selects the apt repo and is the only value you
-# normally change -- set it to whatever the CKA exam environment is currently on
-# (docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks).
-#
-# K8S_PKG optionally pins a patch WITHIN that minor. Leave it empty and you get
-# the newest patch in the repo, which is what you want almost always. Pin it
-# only when you deliberately need an older starting point -- e.g. the Week 5
-# upgrade lab, where you build on v1.34 and upgrade to v1.35.
-#
-#   K8S_MINOR="v1.35" ; K8S_PKG=""         -> newest 1.35.x   (default)
-#   K8S_MINOR="v1.34" ; K8S_PKG=""         -> newest 1.34.x, to upgrade FROM
-#   K8S_MINOR="v1.35" ; K8S_PKG="1.35.4-*" -> exactly that patch
-#
-# List what the repo actually has:  apt-cache madison kubeadm
-K8S_MINOR="v1.35"
-K8S_PKG=""
+# Kubernetes version for a fresh, disposable Ubuntu 24.04 node.
+# Normal CKA lab: v1.37. Week 8's upgrade SOURCE fixture: v1.36.
+# Pass K8S_MINOR=v1.36 in the cloud-init/root process environment for that fixture.
+# K8S_PKG pins an exact apt package version within the selected minor; omit it
+# to receive the newest patch available from that minor-specific repository.
+#   apt-cache madison kubeadm  # inspect actual package versions
+# These overrides let Terraform/cloud-init choose a minor without editing this file.
+: "${K8S_MINOR:=v1.37}"
+: "${K8S_PKG:=}"
+: "${CONTAINERD_PKG:=}"  # optional exact containerd.io apt package version
 YQ_VERSION="v4.44.3"
+
+case "$K8S_MINOR" in
+  v1.36|v1.37) ;;
+  *) echo "!! Unsupported fixture K8S_MINOR=$K8S_MINOR (expected v1.36 or v1.37)"; exit 1 ;;
+esac
+
+# Never run a node-preparation script over a joined or initialized cluster node.
+if [[ -f /etc/kubernetes/kubelet.conf || -f /etc/kubernetes/admin.conf ]]; then
+  echo '!! This node already has Kubernetes credentials. Use the kubeadm upgrade procedure instead.'
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # 0. Retry helper
@@ -100,11 +105,18 @@ lsmod | grep -q '^br_netfilter' || { echo "!! br_netfilter module not loaded"; p
 [ "$prereq_fail" -eq 0 ] || { echo "!! node prerequisites FAILED"; exit 1; }
 echo "    ok: overlay, br_netfilter, bridge-nf-call-iptables, ip_forward, swap off"
 
+# Kubernetes v1.37 needs a usable cgroup v2 host; inspect explicitly rather
+# than discovering a kubelet startup failure much later.
+if [[ "$(stat -fc %T /sys/fs/cgroup)" != "cgroup2fs" ]]; then
+  echo "!! cgroup v2 required for this lab; /sys/fs/cgroup is not cgroup2fs"
+  exit 1
+fi
+
 # ---------------------------------------------------------------------------
 # 2. Exam-parity tooling
 #    The CKA exam pre-installs kubectl (aliased to k, with completion), yq,
-#    curl, wget and man on every host. Match that so nothing you rely on in
-#    the exam is missing here, and nothing is here that isn't there.
+#    curl, wget and man on task hosts. Keep the exam-like shell behaviour,
+#    but remember this lab also adds helpers (Helm, jq, etcd-client, etc.).
 # ---------------------------------------------------------------------------
 
 export DEBIAN_FRONTEND=noninteractive
@@ -139,21 +151,61 @@ retry bash -c 'curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scrip
 # 3. containerd
 # ---------------------------------------------------------------------------
 
-echo "==> containerd"
-retry apt-get install -y containerd
-mkdir -p /etc/containerd
-containerd config default > /etc/containerd/config.toml
-
-# Cgroup driver mismatch between containerd and the kubelet is the #1 reason a
-# hand-built cluster fails. Verify the edit actually landed.
-sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
-if ! grep -q 'SystemdCgroup = true' /etc/containerd/config.toml; then
-  echo "!! SystemdCgroup was NOT set. containerd config format may have changed."
+echo "==> containerd (CRI v1; supported 2.3.x / 2.4.x baseline)"
+# Ubuntu's unversioned 'containerd' package can select a 1.x release. Use the
+# separately signed Docker APT repository for the 'containerd.io' package only.
+# Docker Engine itself is NOT installed on these Kubernetes nodes.
+. /etc/os-release
+if [[ "${ID}" != "ubuntu" || "${VERSION_ID}" != "24.04" ]]; then
+  echo "!! This lab's containerd repository instructions target Ubuntu 24.04 only."
+  exit 1
+fi
+install -m 0755 -d /etc/apt/keyrings
+retry curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+cat > /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: ${UBUNTU_CODENAME:-${VERSION_CODENAME}}
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+retry apt-get update -y
+containerd_candidate=$(apt-cache policy containerd.io | awk '/Candidate:/ { print $2 }')
+selected_containerd="${CONTAINERD_PKG:-$containerd_candidate}"
+if [[ -z "$selected_containerd" || "$selected_containerd" == "(none)" ]] ||
+   ! dpkg --compare-versions "$selected_containerd" ge '2.3.0' ||
+   ! dpkg --compare-versions "$selected_containerd" lt '3.0.0'; then
+  echo "!! containerd.io 2.3.x/2.4.x required; selected package is: $selected_containerd"
+  echo "!! Check: apt-cache madison containerd.io"
+  exit 1
+fi
+retry apt-get install -y "containerd.io=$selected_containerd"
+installed_containerd=$(containerd --version | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+if ! dpkg --compare-versions "${installed_containerd#v}" ge '2.3.0' ||
+   ! dpkg --compare-versions "${installed_containerd#v}" lt '3.0.0'; then
+  echo "!! Unsupported installed containerd version: $installed_containerd"
   exit 1
 fi
 
+mkdir -p /etc/containerd
+# Fresh-node baseline only (this script refuses an initialized/joined node).
+containerd config default > /etc/containerd/config.toml
+# containerd 2.x uses version=3 and the io.containerd.cri.v1.runtime plugin.
+if ! grep -Fq 'io.containerd.cri.v1.runtime' /etc/containerd/config.toml ||
+   ! grep -Eq '^[[:space:]]*version[[:space:]]*=[[:space:]]*3' /etc/containerd/config.toml ||
+   ! grep -Eq '^[[:space:]]*SystemdCgroup[[:space:]]*=[[:space:]]*false' /etc/containerd/config.toml; then
+  echo "!! Unexpected containerd 2.x default config format; inspect config.toml."
+  exit 1
+fi
+sed -i -E 's/^([[:space:]]*SystemdCgroup[[:space:]]*=[[:space:]]*)false/\1true/' /etc/containerd/config.toml
+if ! grep -Eq '^[[:space:]]*SystemdCgroup[[:space:]]*=[[:space:]]*true' /etc/containerd/config.toml; then
+  echo "!! containerd runc SystemdCgroup was not enabled."
+  exit 1
+fi
+systemctl enable --now containerd
 systemctl restart containerd
-systemctl enable containerd
 
 # ---------------------------------------------------------------------------
 # 4. Kubernetes
@@ -185,6 +237,12 @@ apt-mark hold kubelet kubeadm kubectl
 crictl config runtime-endpoint unix:///run/containerd/containerd.sock
 crictl config image-endpoint unix:///run/containerd/containerd.sock
 
+# Validate the CRI API after crictl becomes available, not just the systemd service.
+if ! timeout 20 crictl info >/dev/null 2>&1; then
+  echo "!! CRI v1 endpoint is not responding: unix:///run/containerd/containerd.sock"
+  systemctl status containerd --no-pager || true
+  exit 1
+fi
 systemctl enable --now kubelet
 
 # ---------------------------------------------------------------------------
@@ -242,7 +300,7 @@ echo
 echo "===================================================="
 echo " Node prepared: $(hostname)   in ${BOOTSTRAP_SECS}s"
 kubeadm version -o short
-echo " containerd $(containerd --version | awk '{print $3}')"
+echo " containerd $(containerd --version | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 echo " helm       $(helm version --short 2>/dev/null || echo 'n/a')"
 echo " yq         $(yq --version 2>/dev/null || echo 'n/a')"
 echo " etcdctl    $(etcdctl version 2>/dev/null | head -1 || echo 'n/a')"
